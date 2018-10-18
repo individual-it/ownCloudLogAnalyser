@@ -8,6 +8,7 @@ import (
     "bufio"
     "strings"
     "encoding/json"
+    "strconv"
 )
 
 func main() {
@@ -42,7 +43,10 @@ func main() {
         //see https://www.sohamkamani.com/blog/2017/10/18/parsing-json-in-golang/
         var result map[string]interface{}
         if needJsonDecode {
-            json.Unmarshal([]byte(logFileScanner.Text()), &result)
+            err := json.Unmarshal([]byte(logFileScanner.Text()), &result)
+            if err != nil {
+                log.Fatal("JSON error, line: ", strconv.Itoa(lineCounter), " error: ", err)
+            }
         }
         if *showLineCounterPtr {
             fmt.Printf("%v: ", lineCounter)
