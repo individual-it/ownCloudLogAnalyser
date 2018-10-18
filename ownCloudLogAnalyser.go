@@ -10,6 +10,7 @@ import (
 
 func main() {
     fileNamePtr := flag.String("f", "", "the ownCloud log file")
+    showLineCounterPtr := flag.Bool("linenumbers", false, "show the line numbers")
     flag.Parse()
 
     logFile, err := os.Open(*fileNamePtr)
@@ -21,8 +22,14 @@ func main() {
     defer logFile.Close()
 
     logFileScanner := bufio.NewScanner(logFile)
+    lineCounter := 1
     for logFileScanner.Scan() {
-        fmt.Println(logFileScanner.Text())
+        if *showLineCounterPtr {
+            fmt.Printf("%v: %v\n", lineCounter, logFileScanner.Text())
+        } else {
+            fmt.Println(logFileScanner.Text())
+        }
+        lineCounter++
     }
 
     if err := logFileScanner.Err(); err != nil {
