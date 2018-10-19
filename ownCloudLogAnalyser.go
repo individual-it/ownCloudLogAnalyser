@@ -12,6 +12,50 @@ import (
     "gopkg.in/Knetic/govaluate.v3"
 )
 
+type logLine struct {
+    lineNumber int
+    raw string
+    decodedData map[string]interface{}
+    showLine bool
+}
+
+// decodes the raw data and updates logLine.decodedData
+func (logLine *logLine) jsonDecode() {
+    //parse unstructured json
+    //see https://www.sohamkamani.com/blog/2017/10/18/parsing-json-in-golang/
+    err := json.Unmarshal([]byte(logLine.raw), &logLine.decodedData)
+    checkErr("JSON error in line: " + strconv.Itoa(logLine.lineNumber) + ".", err)
+}
+
+// evaluates the given filter and updates logLine.showLine according to the filter 
+func (logLine *logLine) evaluateFilter(filter string) {
+    filterExpression, err := govaluate.NewEvaluableExpression(filter);
+    checkErr("Cannot evaluate filter string.", err)
+    filterResult, err := filterExpression.Evaluate(logLine.decodedData);
+    checkErr("Cannot evaluate filter string.", err)
+    if filterResult!=true {
+        logLine.showLine = false
+    }
+}
+
+// prints the formated output
+func (logLine *logLine) printLine(showLineCounter bool, listOfKeysToView []string) {
+    if logLine.showLine {
+        if showLineCounter {
+            fmt.Printf("%v: ", logLine.lineNumber)
+        }
+        if len(listOfKeysToView) > 0 {
+            //show only the keys we requested
+            for _, jsonKey := range listOfKeysToView {
+                fmt.Printf("%v: %v\t", jsonKey, logLine.decodedData[jsonKey])
+            }
+            fmt.Println()
+        } else {
+            fmt.Println(logLine.raw)
+        }
+    }
+}
+
 func checkErr(message string, err error) {
     //for error handling see https://davidnix.io/post/error-handling-in-go/
     if err != nil {
@@ -49,38 +93,18 @@ func main() {
 
     //main loop to loop through the log file
     for logFileScanner.Scan() {
-        //parse unstructured json
-        //see https://www.sohamkamani.com/blog/2017/10/18/parsing-json-in-golang/
-        var decodedData map[string]interface{}
+        currentLogLine := logLine {
+            raw: logFileScanner.Text(),
+            lineNumber: lineCounter,
+            showLine: true }
         if needJsonDecode {
-            err := json.Unmarshal([]byte(logFileScanner.Text()), &decodedData)
-            checkErr("JSON error in line: " + strconv.Itoa(lineCounter) + ".", err)
+            currentLogLine.jsonDecode()
         }
-        showLine := true
         if *filterPtr != "" {
-            filterExpression, err := govaluate.NewEvaluableExpression(*filterPtr);
-            checkErr("Cannot evaluate filter string.", err)
-            filterResult, err := filterExpression.Evaluate(decodedData);
-            checkErr("Cannot evaluate filter string.", err)
-            if filterResult!=true {
-                showLine = false
-            }
+            currentLogLine.evaluateFilter(*filterPtr)
         }
 
-        if showLine {
-            if *showLineCounterPtr {
-                fmt.Printf("%v: ", lineCounter)
-            }
-            if len(listOfKeysToView) > 0 {
-                //show only the keys we requested
-                for _, jsonKey := range listOfKeysToView {
-                    fmt.Printf("%v: %v\t", jsonKey, decodedData[jsonKey])
-                }
-                fmt.Println()
-            } else {
-                fmt.Println(logFileScanner.Text())
-            }
-        }
+        currentLogLine.printLine(*showLineCounterPtr, listOfKeysToView)
         lineCounter++
     }
 
