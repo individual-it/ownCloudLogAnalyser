@@ -52,16 +52,22 @@ func main() {
                 log.Fatal("JSON error, line: ", strconv.Itoa(lineCounter), " error: ", err)
             }
         }
-        filterExpression, err := govaluate.NewEvaluableExpression(*filterPtr);
-        if err != nil {
-            log.Fatal("cannot evaluate filter string: ", err)
-        }
-        filterResult, err := filterExpression.Evaluate(decodedData);
-        if err != nil {
-            log.Fatal("cannot evaluate filter string: ", err)
+        showLine := true
+        if *filterPtr != "" {
+            filterExpression, err := govaluate.NewEvaluableExpression(*filterPtr);
+            if err != nil {
+                log.Fatal("cannot evaluate filter string: ", err)
+            }
+            filterResult, err := filterExpression.Evaluate(decodedData);
+            if filterResult!=true {
+                showLine = false
+            }
+            if err != nil {
+                log.Fatal("cannot evaluate filter string: ", err)
+            }
         }
 
-        if filterResult==true {
+        if showLine {
             if *showLineCounterPtr {
                 fmt.Printf("%v: ", lineCounter)
             }
