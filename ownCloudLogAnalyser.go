@@ -12,6 +12,13 @@ import (
     "gopkg.in/Knetic/govaluate.v3"
 )
 
+func checkErr(message string, err error) {
+    //for error handling see https://davidnix.io/post/error-handling-in-go/
+    if err != nil {
+        log.Fatal("ERROR! ", message, " Details: ", err)
+    }
+}
+
 func main() {
     fileNamePtr := flag.String("f", "", "the ownCloud log file")
     showLineCounterPtr := flag.Bool("linenumbers", false, "show the line numbers")
@@ -20,9 +27,8 @@ func main() {
     flag.Parse()
 
     logFile, err := os.Open(*fileNamePtr)
-    if err != nil {
-        log.Fatal(err)
-    }
+    checkErr("Failed to read the logfile.", err)
+
     //make sure the file is closed also when somethig fails
     //see https://blog.golang.org/defer-panic-and-recover
     defer logFile.Close()
@@ -48,22 +54,16 @@ func main() {
         var decodedData map[string]interface{}
         if needJsonDecode {
             err := json.Unmarshal([]byte(logFileScanner.Text()), &decodedData)
-            if err != nil {
-                log.Fatal("JSON error, line: ", strconv.Itoa(lineCounter), " error: ", err)
-            }
+            checkErr("JSON error in line: " + strconv.Itoa(lineCounter) + ".", err)
         }
         showLine := true
         if *filterPtr != "" {
             filterExpression, err := govaluate.NewEvaluableExpression(*filterPtr);
-            if err != nil {
-                log.Fatal("cannot evaluate filter string: ", err)
-            }
+            checkErr("Cannot evaluate filter string.", err)
             filterResult, err := filterExpression.Evaluate(decodedData);
+            checkErr("Cannot evaluate filter string.", err)
             if filterResult!=true {
                 showLine = false
-            }
-            if err != nil {
-                log.Fatal("cannot evaluate filter string: ", err)
             }
         }
 
@@ -84,7 +84,5 @@ func main() {
         lineCounter++
     }
 
-    if err := logFileScanner.Err(); err != nil {
-        log.Fatal(err)
-    }
+    checkErr("Failed to read the logfile.", logFileScanner.Err())
 }
