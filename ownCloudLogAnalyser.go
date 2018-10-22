@@ -4,12 +4,11 @@ import (
     "fmt"
     "flag"
     "log"
-    "os"
-    "bufio"
     "strings"
     "encoding/json"
     "strconv"
     "gopkg.in/Knetic/govaluate.v3"
+    "github.com/hpcloud/tail"
 )
 
 type logLine struct {
@@ -64,20 +63,13 @@ func checkErr(message string, err error) {
 }
 
 func main() {
-    fileNamePtr := flag.String("f", "", "the ownCloud log file")
+    fileNamePtr := flag.String("file", "", "the ownCloud log file")
+    followPtr := flag.Bool("f", false, "output appended data as the file grows")
     showLineCounterPtr := flag.Bool("linenumbers", false, "show the line numbers")
     listOfKeysToViewStringPtr := flag.String("view", "", "list of keys to be shown (separate by comma), if empty all are shown")
     filterPtr := flag.String("filter", "", "filter the output by logical expressions e.g. \"user=='admin'&&level>=3\"")
     flag.Parse()
 
-    logFile, err := os.Open(*fileNamePtr)
-    checkErr("Failed to read the logfile.", err)
-
-    //make sure the file is closed also when somethig fails
-    //see https://blog.golang.org/defer-panic-and-recover
-    defer logFile.Close()
-
-    logFileScanner := bufio.NewScanner(logFile)
     lineCounter := 1
     needJsonDecode := false
 
@@ -92,9 +84,15 @@ func main() {
     }
 
     //main loop to loop through the log file
-    for logFileScanner.Scan() {
+    tail, err := tail.TailFile(
+        *fileNamePtr,
+        tail.Config{
+            Follow: *followPtr,
+            MustExist: true })
+    checkErr("Failed to read the logfile.", err)
+    for line := range tail.Lines {
         currentLogLine := logLine {
-            raw: logFileScanner.Text(),
+            raw: line.Text,
             lineNumber: lineCounter,
             showLine: true }
         if needJsonDecode {
@@ -108,5 +106,5 @@ func main() {
         lineCounter++
     }
 
-    checkErr("Failed to read the logfile.", logFileScanner.Err())
+    checkErr("Failed to read the logfile.", tail.Err())
 }
