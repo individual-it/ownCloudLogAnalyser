@@ -1,6 +1,7 @@
 package main
 
 import (
+    "os"
     "fmt"
     "flag"
     "log"
@@ -26,7 +27,7 @@ func (logLine *logLine) jsonDecode() {
     checkErr("JSON error in line: " + strconv.Itoa(logLine.lineNumber) + ".", err)
 }
 
-// evaluates the given filter and updates logLine.showLine according to the filter 
+// evaluates the given filter and updates logLine.showLine according to the filter
 func (logLine *logLine) evaluateFilter(filter string) {
     filterExpression, err := govaluate.NewEvaluableExpression(filter);
     checkErr("Cannot evaluate filter string.", err)
@@ -68,6 +69,7 @@ func main() {
     showLineCounterPtr := flag.Bool("linenumbers", false, "show the line numbers")
     listOfKeysToViewStringPtr := flag.String("view", "", "list of keys to be shown (separate by comma), if empty all are shown")
     filterPtr := flag.String("filter", "", "filter the output by logical expressions e.g. \"user=='admin'&&level>=3\"")
+    tailPtr := flag.Int64("tail", 0, "show only the n last lines")
     flag.Parse()
 
     lineCounter := 1
@@ -82,15 +84,38 @@ func main() {
     if *listOfKeysToViewStringPtr != "" {
        listOfKeysToView = strings.Split(*listOfKeysToViewStringPtr, ",")
     }
+    var seekOffset int64 = 0
+    if *tailPtr > 0 {
+        var lineBreaksCounter int64
 
+        logFile, err := os.Open(*fileNamePtr)
+        defer logFile.Close()
+        checkErr("Failed to read the logfile.", err)
+        for lineBreaksCounter = 0; lineBreaksCounter <= *tailPtr; {
+            seekOffset--
+            _, err = logFile.Seek(seekOffset, os.SEEK_END)
+            checkErr("Failed to read the logfile.", err)
+            readByte := make([]byte, 1)
+            _, err = logFile.Read(readByte)
+            checkErr("Failed to read the logfile.", err)
+            if string(readByte) == "\n" {
+                lineBreaksCounter++
+            }
+        }
+    }
     //main loop to loop through the log file
-    tail, err := tail.TailFile(
+    logFile, err := tail.TailFile(
         *fileNamePtr,
         tail.Config{
             Follow: *followPtr,
-            MustExist: true })
+            MustExist: true})
+        if *tailPtr > 0 {
+            logFile.Location = &tail.SeekInfo{seekOffset+1, os.SEEK_END}
+        }
+
     checkErr("Failed to read the logfile.", err)
-    for line := range tail.Lines {
+
+    for line := range logFile.Lines {
         currentLogLine := logLine {
             raw: line.Text,
             lineNumber: lineCounter,
@@ -106,5 +131,5 @@ func main() {
         lineCounter++
     }
 
-    checkErr("Failed to read the logfile.", tail.Err())
+    checkErr("Failed to read the logfile.", logFile.Err())
 }
