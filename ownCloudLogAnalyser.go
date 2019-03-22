@@ -32,8 +32,7 @@ func (logLine *logLine) evaluateFilter(filter string) {
     filterExpression, err := govaluate.NewEvaluableExpression(filter);
     checkErr("Cannot evaluate filter string.", err)
     filterResult, err := filterExpression.Evaluate(logLine.decodedData);
-    checkErr("Cannot evaluate filter string.", err)
-    if filterResult!=true {
+    if filterResult!=true || err != nil{
         logLine.showLine = false
     }
 }
